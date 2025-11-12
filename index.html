@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HTML/CSS/JS Песочница</title>
+
+    <!-- Tailwind (dark mode by class) -->
+    <script>window.tailwind = window.tailwind || {}; window.tailwind.config = { darkMode: 'class' };</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- CodeMirror + Lint -->
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/lib/codemirror.css" />
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/theme/material-darker.css" />
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/addon/lint/lint.css" />
+    <script src="https://unpkg.com/codemirror@5.65.16/lib/codemirror.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/xml/xml.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/javascript/javascript.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/css/css.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/htmlmixed/htmlmixed.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/lint.js"></script>
+    <script src="https://unpkg.com/jshint@2.13.6/dist/jshint.js"></script>
+    <script src="https://unpkg.com/csslint@1.0.5/dist/csslint.js"></script>
+    <script src="https://unpkg.com/htmlhint@0.16.3/dist/htmlhint.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/javascript-lint.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/css-lint.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/html-lint.js"></script>
+
+    <meta name="color-scheme" content="dark light" />
+    <style>
+      .CodeMirror { height: 60vh; }
+      @media (min-width: 1024px) { .CodeMirror { height: 70vh; } }
+      img.logo { image-rendering: -webkit-optimize-contrast; }
+      .hidden-el { display: none; }
+    </style>
+  </head>
+  <body class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div class="min-h-screen p-4 md:p-6">
+      <div class="max-w-[1400px] mx-auto">
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <div class="flex items-center gap-3">
+            <img src="./logo.webp" alt="Logo" class="logo h-8 w-auto select-none" />
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="themeToggle" class="px-3 py-2 rounded-2xl shadow-md bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600" title="Переключить тему" aria-label="Переключить тему">🌞 Светлая</button>
+            <select id="deviceSelect" class="px-3 py-2 rounded-2xl bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
+              <option value="desktop">Десктоп 1440px</option>
+              <option value="tablet">Планшет 768px</option>
+              <option value="mobile">Мобильный 375px</option>
+            </select>
+            <button id="runBtn" class="px-4 py-2 rounded-2xl shadow-md bg-indigo-600 hover:bg-indigo-500 active:scale-[.99] transition" title="Запуск (Ctrl/Cmd + Enter)">▶ Запуск</button>
+            <button id="exportBtn" class="px-4 py-2 rounded-2xl shadow-md bg-emerald-600 hover:bg-emerald-500 active:scale-[.99] transition" title="Экспортировать проект в JSON">⤓ Экспорт</button>
+            <button id="importBtn" class="px-4 py-2 rounded-2xl shadow-md bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600" title="Импортировать проект из JSON">⤒ Импорт</button>
+            <input id="fileInput" type="file" accept="application/json" class="hidden" />
+          </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="rounded-2xl bg-slate-100 border border-slate-300 overflow-hidden dark:bg-slate-800/60 dark:border-slate-700">
+            <div class="flex items-center gap-1 bg-slate-50 border-b border-slate-300 dark:bg-slate-900/60 dark:border-slate-700">
+              <button data-tab="html" class="tab-btn px-4 py-2 text-sm md:text-base transition border-b-2 -mb-[1px] border-indigo-600 text-indigo-700 bg-indigo-50 dark:border-indigo-500 dark:text-indigo-300 dark:bg-slate-800">HTML</button>
+              <button data-tab="css" class="tab-btn px-4 py-2 text-sm md:text-base transition border-b-2 -mb-[1px] border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/50">CSS</button>
+              <button data-tab="js" class="tab-btn px-4 py-2 text-sm md:text-base transition border-b-2 -mb-[1px] border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/50">JS</button>
+            </div>
+            <div class="p-0">
+              <div id="htmlHost"></div>
+              <div id="cssHost" class="hidden-el"></div>
+              <div id="jsHost" class="hidden-el"></div>
+            </div>
+          </div>
+
+          <div class="rounded-2xl bg-slate-100 border border-slate-300 overflow-hidden flex flex-col dark:bg-slate-800/60 dark:border-slate-700">
+            <div class="px-4 py-2 text-sm border-b border-slate-300 flex items-center justify-between dark:border-slate-700">
+              <span class="opacity-80">Предпросмотр</span>
+              <span class="opacity-60">iframe sandbox</span>
+            </div>
+            <div class="w-full flex justify-center p-3">
+              <div id="previewWrap" class="border border-slate-300 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm max-w-full" style="width: 1440px">
+                <iframe id="preview" title="preview" class="w-full h-[60vh] lg:h-[70vh] bg-white" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-presentation allow-same-origin allow-scripts"></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="mt-4 rounded-2xl bg-slate-100 border border-slate-300 overflow-hidden dark:bg-slate-800/60 dark:border-slate-700">
+          <div class="px-4 py-2 text-sm border-b border-slate-300 flex items-center justify-between dark:border-slate-700">
+            <span class="opacity-80">Консоль</span>
+            <div class="flex items-center gap-2">
+              <button id="clearConsole" class="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Очистить</button>
+            </div>
+          </div>
+          <div id="consoleOut" class="max-h-[30vh] overflow-auto font-mono text-xs p-3 space-y-1 bg-white dark:bg-slate-900">
+            <div class="opacity-50">Вывод появится после запуска (или из кода через console.log).</div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        const LS = { html:'play_html', css:'play_css', js:'play_js', theme: 'theme' };
+        const DEFAULTS = {
+          html: '<!-- Измени меня! -->\n<div class="app">\n  <h1>Hello, world! 👋</h1>\n  <button id="btn">Нажми меня</button>\n  <p class="note">Правь HTML, CSS и JS на вкладках слева, затем жми "Запуск"</p>\n</div>',
+          css: '.app {\n  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";\n  padding: 24px;\n}\n:root { --bg:#0b1220; --panel:#0f172a; --text:#0b1220; --text-dark:#e5e7eb; --accent:#4f46e5; }\nbody { color-scheme: light dark; }\nbutton { background: var(--accent); border:0; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer;}\n.note{opacity:.8;}',
+          js: 'const btn=document.getElementById("btn"); btn.addEventListener("click",()=>{ btn.textContent="🚀 Поехали!"; console.log("Кнопка нажата"); alert("JavaScript работает!"); });'
+        };
+
+        // Theme
+        function applyTheme(t){
+          const root=document.documentElement;
+          if(t==='dark') root.classList.add('dark'); else root.classList.remove('dark');
+          localStorage.setItem(LS.theme, t);
+          document.getElementById('themeToggle').textContent = t==='dark' ? '🌙 Тёмная' : '🌞 Светлая';
+          const cmTheme = t==='dark' ? 'material-darker' : 'default';
+          cmHtml && cmHtml.setOption('theme', cmTheme);
+          cmCss && cmCss.setOption('theme', cmTheme);
+          cmJs && cmJs.setOption('theme', cmTheme);
+        }
+        function initialTheme(){
+          const saved=localStorage.getItem(LS.theme);
+          if(saved==='light'||saved==='dark') return saved;
+          return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        // Editors
+        let cmHtml, cmCss, cmJs;
+        function initEditors(){
+          const h = localStorage.getItem(LS.html) ?? DEFAULTS.html;
+          const c = localStorage.getItem(LS.css) ?? DEFAULTS.css;
+          const j = localStorage.getItem(LS.js) ?? DEFAULTS.js;
+          cmHtml = CodeMirror(document.getElementById('htmlHost'), { value: h, mode:'htmlmixed', theme: initialTheme()==='dark'?'material-darker':'default', lineNumbers:true, gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'], lint:true });
+          cmCss  = CodeMirror(document.getElementById('cssHost'),  { value: c, mode:'css',        theme: initialTheme()==='dark'?'material-darker':'default', lineNumbers:true, gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'], lint:true });
+          cmJs   = CodeMirror(document.getElementById('jsHost'),   { value: j, mode:'javascript', theme: initialTheme()==='dark'?'material-darker':'default', lineNumbers:true, gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'], lint:true });
+          cmHtml.on('change', cm=>localStorage.setItem(LS.html, cm.getValue()));
+          cmCss.on('change',  cm=>localStorage.setItem(LS.css,  cm.getValue()));
+          cmJs.on('change',   cm=>localStorage.setItem(LS.js,   cm.getValue()));
+        }
+
+        // Tabs
+        function switchTab(tab){
+          document.querySelectorAll('.tab-btn').forEach(btn=>{
+            const active = btn.getAttribute('data-tab')===tab;
+            btn.classList.toggle('border-indigo-600', active);
+            btn.classList.toggle('text-indigo-700', active);
+            btn.classList.toggle('bg-indigo-50', active);
+            btn.classList.toggle('dark:border-indigo-500', active);
+            btn.classList.toggle('dark:text-indigo-300', active);
+            btn.classList.toggle('dark:bg-slate-800', active);
+            if(!active){
+              btn.classList.add('border-transparent');
+            } else {
+              btn.classList.remove('border-transparent');
+            }
+          });
+          document.getElementById('htmlHost').parentElement.classList.toggle('hidden-el', tab!=='html');
+          document.getElementById('cssHost').parentElement.classList.toggle('hidden-el', tab!=='css');
+          document.getElementById('jsHost').parentElement.classList.toggle('hidden-el', tab!=='js');
+          setTimeout(()=>{
+            if(tab==='html') cmHtml.refresh();
+            if(tab==='css') cmCss.refresh();
+            if(tab==='js')  cmJs.refresh();
+          },0);
+        }
+
+        // Preview & console
+        const iframe = () => document.getElementById('preview');
+        function appendLog(level, text){
+          const out = document.getElementById('consoleOut');
+          const div = document.createElement('div');
+          div.className = level==='error' ? 'text-red-600 dark:text-red-400' : level==='warn' ? 'text-yellow-700 dark:text-yellow-300' : level==='info' ? 'text-sky-700 dark:text-sky-300' : 'text-slate-700 dark:text-slate-200';
+          div.innerHTML = '<span class="opacity-60">['+level+']</span> ' + text;
+          out.appendChild(div);
+          out.scrollTop = out.scrollHeight;
+        }
+        function clearLogs(){ document.getElementById('consoleOut').innerHTML = ''; }
+
+        window.addEventListener('message', e => {
+          const d=e.data; if(!d||!d.__sandboxLog) return;
+          appendLog(d.type, (d.payload||[]).join(' '));
+        });
+
+        function buildSrcDoc(){
+          const html = cmHtml.getValue();
+          const css  = cmCss.getValue();
+          const js   = cmJs.getValue();
+          return '<!doctype html><html lang="ru"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><style>'+css+'</style></head><body>'+html+'\n<script>(function(){const p=window.parent;function post(t,a){try{p.postMessage({__sandboxLog:true,type:t,payload:a},"*")}catch(e){}}["log","info","warn","error"].forEach(fn=>{const o=console[fn].bind(console);console[fn]=function(){post(fn,Array.from(arguments).map(a=>{try{return typeof a==="object"?JSON.stringify(a):String(a)}catch(e){return String(a)}}));o.apply(console,arguments);};});window.addEventListener("error",function(e){post("error",[e.message||"Error",e.filename?e.filename+":"+e.lineno+":"+e.colno:""]);});})();<\/script>\n<script>try{'+js+'}catch(e){console.error(e && e.stack ? e.stack : e.toString());}<\/script></body></html>';
+        }
+        function run(){
+          appendLog('info','Перезапуск предпросмотра…');
+          iframe().srcdoc = buildSrcDoc();
+        }
+
+        // Device width
+        function deviceWidth(val){ return val==='desktop'?1440 : val==='tablet'?768 : 375; }
+
+        // Export/Import
+        function exportProject(){
+          const payload = { version:1, html: cmHtml.getValue(), css: cmCss.getValue(), js: cmJs.getValue(), exportedAt: new Date().toISOString() };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href=url; a.download='playground-project-'+Date.now()+'.json'; a.click();
+          URL.revokeObjectURL(url);
+        }
+        async function importProject(file){
+          const text = await file.text();
+          const data = JSON.parse(text);
+          if(!data || typeof data.html!=='string' || typeof data.css!=='string' || typeof data.js!=='string') throw new Error('Неверный формат файла');
+          cmHtml.setValue(data.html); cmCss.setValue(data.css); cmJs.setValue(data.js);
+          run();
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+          initEditors();
+          applyTheme(initialTheme());
+          switchTab('html');
+          run();
+
+          // events
+          document.getElementById('themeToggle').addEventListener('click', () => {
+            applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+          });
+          document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab'))));
+          document.getElementById('runBtn').addEventListener('click', run);
+          document.getElementById('exportBtn').addEventListener('click', exportProject);
+          document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+          document.getElementById('fileInput').addEventListener('change', e => { const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) importProject(f).catch(err=>alert('Импорт не удался: '+(err.message||err))); });
+          document.getElementById('deviceSelect').addEventListener('change', e => { document.getElementById('previewWrap').style.width = deviceWidth(e.target.value)+'px'; });
+          document.getElementById('clearConsole').addEventListener('click', clearLogs);
+
+          // hotkey
+          window.addEventListener('keydown', e => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'enter') { e.preventDefault(); run(); }
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
