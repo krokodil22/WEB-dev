@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ru" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HTML/CSS/JS Песочница</title>
+
+    <script>window.tailwind=window.tailwind||{};window.tailwind.config={darkMode:'class'};</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- CodeMirror 5 + Lint -->
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/lib/codemirror.css" />
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/theme/material-darker.css" />
+    <link rel="stylesheet" href="https://unpkg.com/codemirror@5.65.16/addon/lint/lint.css" />
+    <script src="https://unpkg.com/codemirror@5.65.16/lib/codemirror.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/xml/xml.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/javascript/javascript.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/css/css.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/mode/htmlmixed/htmlmixed.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/lint.js"></script>
+    <script src="https://unpkg.com/jshint@2.13.6/dist/jshint.js"></script>
+    <script src="https://unpkg.com/csslint@1.0.5/dist/csslint.js"></script>
+    <script src="https://unpkg.com/htmlhint@0.16.3/dist/htmlhint.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/javascript-lint.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/css-lint.js"></script>
+    <script src="https://unpkg.com/codemirror@5.65.16/addon/lint/html-lint.js"></script>
+
+    <meta name="color-scheme" content="dark light" />
+    <style>
+      html,body{height:100%}
+      .CodeMirror{height:60vh}
+      @media (min-width:1024px){.CodeMirror{height:70vh}}
+      .hidden-el{display:none}
+      .range{accent-color:#4f46e5}
+      .transition-theme{transition:background-color .2s ease,color .2s ease,border-color .2s ease}
+      .device-viewport{transform-origin:top left;background:#fff}
+      .device-wrapper{position:relative;overflow:hidden}
+      .device-badge{position:sticky;top:6px;right:8px;float:right;font-size:10px;opacity:.7;margin:6px 8px 0 0}
+      .dropzone{border:2px dashed rgba(148,163,184,.7); border-radius:12px; padding:20px; text-align:center}
+      .dropzone.drag{background:rgba(99,102,241,.08); border-color:#6366f1}
+      .chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(148,163,184,.5);background:rgba(241,245,249,.6)}
+      .chip .rm{border:none;border-radius:8px;padding:4px 6px;cursor:pointer}
+      .chip .rm:hover{background:#fee2e2}
+      .dark .chip{background:rgba(15,23,42,.6);border-color:#334155}
+      .dark .chip .rm:hover{background:#7f1d1d;color:#fff}
+    </style>
+  </head>
+  <body class="h-full transition-theme bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div class="min-h-screen p-4 md:p-6">
+      <div class="max-w-[1400px] mx-auto">
+        <header class="transition-theme rounded-2xl mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-2 md:p-3 bg-white/70 border border-slate-200 backdrop-blur-sm dark:bg-slate-800/60 dark:border-slate-700">
+          <div class="flex items-center gap-3">
+            <img src="./logo.webp" alt="Logo" class="h-8 w-auto select-none" />
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="themeToggle" class="transition-theme px-3 py-2 rounded-2xl shadow-sm bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">🌞 Светлая</button>
+            <select id="deviceProfile" class="transition-theme px-3 py-2 rounded-2xl bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
+              <option value="desk1440x900">Десктоп 1440×900 (16:10)</option>
+              <option value="tab768x1024">Планшет 768×1024 (4:3)</option>
+              <option value="mob375x812">Мобильный 375×812 (iPhone X)</option>
+            </select>
+            <button id="runBtn" class="px-4 py-2 rounded-2xl shadow-md bg-indigo-600 hover:bg-indigo-500 active:scale-[.99] transition">▶ Запуск</button>
+            <button id="exportBtn" class="px-4 py-2 rounded-2xl shadow-md bg-emerald-600 hover:bg-emerald-500 active:scale-[.99] transition">⤓ Экспорт</button>
+            <button id="importBtn" class="transition-theme px-4 py-2 rounded-2xl shadow-sm bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600">⤒ Импорт</button>
+            <input id="fileInput" type="file" accept="application/json" class="hidden" />
+            <button id="assetsBtn" class="transition-theme px-3 py-2 rounded-2xl shadow-sm bg-sky-200 text-slate-900 hover:bg-sky-300 dark:bg-sky-700 dark:text-slate-100 dark:hover:bg-sky-600">📁 Файлы</button>
+            <input id="assetsInput" type="file" multiple class="hidden" />
+          </div>
+        </header>
+
+        <div id="assetsBar" class="hidden transition-theme mb-3 rounded-2xl bg-white border border-slate-200 p-3 text-sm dark:bg-slate-800/60 dark:border-slate-700">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <b class="opacity-80">Локальные файлы</b>
+            <div class="flex items-center gap-2">
+              <button id="assetsAddBtn" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white hover:bg-sky-500">Добавить файлы</button>
+              <span class="opacity-60">используйте ссылки вида <code>assets/имя_файла</code></span>
+            </div>
+          </div>
+          <div id="dropzone" class="dropzone mb-3">Перетащите файлы сюда или нажмите «Добавить файлы»</div>
+          <div id="assetsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div id="editorPanel" class="transition-theme rounded-2xl bg-white border border-slate-200 overflow-hidden dark:bg-slate-800/60 dark:border-slate-700">
+            <div class="transition-theme flex items-center justify-between gap-2 bg-slate-50 border-b border-slate-200 dark:bg-slate-900/60 dark:border-slate-700 px-2">
+              <div class="flex items-center gap-1">
+                <button data-tab="html" class="tab-btn px-4 py-2 text-sm md:text-base transition border-b-2 -mb-[1px] border-indigo-600 text-indigo-700 bg-indigo-50 dark:border-indigo-500 dark:text-indigo-300 dark:bg-slate-800">HTML</button>
+                <button data-tab="css" class="tab-btn px-4 py-2 text-sm md:text-base transition border-b-2 -mb-[1px] border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/50">CSS</button>
+                <button data-tab="js" class="tab-btn px-4 py-2 text-sm md:text-base transition border-b-2 -mb-[1px] border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/50">JS</button>
+              </div>
+              <div class="flex items-center gap-2 text-xs md:text-sm px-2 py-1">
+                <span class="opacity-70">Кегль</span>
+                <input id="fontSizeRange" class="range" type="range" min="12" max="24" step="1" value="16" />
+                <span id="fontSizeValue" class="tabular-nums opacity-80">16px</span>
+              </div>
+            </div>
+            <div class="p-0">
+              <div id="htmlHost"></div>
+              <div id="cssHost" class="hidden-el"></div>
+              <div id="jsHost" class="hidden-el"></div>
+            </div>
+          </div>
+
+          <div id="previewPanel" class="transition-theme rounded-2xl bg-white border border-slate-200 overflow-hidden flex flex-col dark:bg-slate-800/60 dark:border-slate-700">
+            <div class="transition-theme px-4 py-2 text-sm border-b border-slate-200 flex items-center justify-between dark:border-slate-700">
+              <span class="opacity-80">Предпросмотр</span>
+              <span id="sizeBadge" class="opacity-60">iframe sandbox</span>
+            </div>
+            <div class="w-full flex justify-center p-3">
+              <div id="previewArea" class="device-wrapper transition-theme border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm max-w-full bg-slate-100 dark:bg-slate-900">
+                <div id="viewport" class="device-viewport">
+                  <iframe id="preview" title="preview" class="w-full h-full bg-white dark:bg-slate-900" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-presentation allow-same-origin allow-scripts"></iframe>
+                </div>
+                <div class="device-badge" id="scaleBadge"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="transition-theme mt-4 rounded-2xl bg-white border border-slate-200 overflow-hidden dark:bg-slate-800/60 dark:border-slate-700">
+          <div class="transition-theme px-4 py-2 text-sm border-b border-slate-200 flex items-center justify-between dark:border-slate-700">
+            <span class="opacity-80">Консоль</span>
+            <div class="flex items-center gap-2">
+              <button id="clearConsole" class="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600">Очистить</button>
+            </div>
+          </div>
+          <div id="consoleOut" class="max-h-[30vh] overflow-auto font-mono text-xs p-3 space-y-1 bg-white dark:bg-slate-900">
+            <div class="opacity-50">Вывод появится после запуска (или из кода через console.log).</div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        const LS={html:'play_html',css:'play_css',js:'play_js',theme:'theme',fontSize:'editor_fontsize',profile:'device_profile'};
+        const DEFAULTS={html:'',css:'',js:''};
+
+        let cmHtml,cmCss,cmJs;
+
+        function applyTheme(t){
+          const on=t==='dark';
+          document.documentElement.classList.toggle('dark',on);
+          document.body.classList.toggle('dark',on);
+          localStorage.setItem(LS.theme,t);
+          const btn=document.getElementById('themeToggle'); if(btn) btn.textContent=on?'🌙 Тёмная':'🌞 Светлая';
+          const cmTheme=on?'material-darker':'default';
+          [cmHtml,cmCss,cmJs].forEach(cm=>cm&&cm.setOption('theme',cmTheme));
+        }
+        function initialTheme(){
+          const saved=localStorage.getItem(LS.theme);
+          if(saved==='light'||saved==='dark') return saved;
+          return (window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+        }
+
+        function setEditorFontSize(px){
+          document.getElementById('fontSizeValue').textContent=px+'px';
+          document.querySelectorAll('.CodeMirror').forEach(el=>el.style.fontSize=px+'px');
+          [cmHtml,cmCss,cmJs].forEach(cm=>cm&&cm.refresh());
+        }
+        function initEditors(){
+          const h=localStorage.getItem(LS.html);
+          const c=localStorage.getItem(LS.css);
+          const j=localStorage.getItem(LS.js);
+          const theme=initialTheme()==='dark'?'material-darker':'default';
+          cmHtml=CodeMirror(document.getElementById('htmlHost'),{value:h??DEFAULTS.html,mode:'htmlmixed',theme,lineNumbers:true,gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'],lint:true});
+          cmCss =CodeMirror(document.getElementById('cssHost'), {value:c??DEFAULTS.css,mode:'css',theme,lineNumbers:true,gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'],lint:true});
+          cmJs  =CodeMirror(document.getElementById('jsHost'),  {value:j??DEFAULTS.js,mode:'javascript',theme,lineNumbers:true,gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'],lint:{esversion:6}});
+          cmHtml.on('change',cm=>localStorage.setItem(LS.html,cm.getValue()));
+          cmCss.on('change', cm=>localStorage.setItem(LS.css, cm.getValue()));
+          cmJs.on('change',  cm=>localStorage.setItem(LS.js,  cm.getValue()));
+          const fs=parseInt(localStorage.getItem(LS.fontSize)||'16',10);
+          document.getElementById('fontSizeRange').value=fs;
+          setEditorFontSize(fs);
+        }
+
+        const PROFILES={desk1440x900:{w:1440,h:900,label:'Десктоп 1440×900 (16:10)'},tab768x1024:{w:768,h:1024,label:'Планшет 768×1024 (4:3)'},mob375x812:{w:375,h:812,label:'Мобильный 375×812 (iPhone X)'}};
+        let currentProfile=localStorage.getItem(LS.profile)||'desk1440x900';
+        function getDims(){return PROFILES[currentProfile]||PROFILES.desk1440x900;}
+        function label(){return (PROFILES[currentProfile]||PROFILES.desk1440x900).label;}
+
+        // Assets
+        const assets=new Map(); // name -> blobURL
+        function addAssets(files){
+          const list=document.getElementById('assetsList');
+          Array.from(files).forEach(f=>{
+            const old=assets.get(f.name); if(old){ URL.revokeObjectURL(old); }
+            const url=URL.createObjectURL(f); assets.set(f.name,url);
+            const row=document.createElement('div');
+            row.className='chip';
+            row.innerHTML='<div class="truncate"><b class="mr-1">'+f.name+'</b><span class="opacity-60">('+Math.ceil(f.size/1024)+' KB)</span><div class="text-xs opacity-80">assets/'+f.name+'</div></div><div class="flex items-center gap-2"><a class="text-xs underline" href="'+url+'" target="_blank">просмотр</a><button class="rm" title="Удалить" aria-label="Удалить">✕</button></div>';
+            // remove handler
+            row.querySelector('.rm').addEventListener('click',function(){
+              try{
+                const blob=assets.get(f.name);
+                if(blob){ URL.revokeObjectURL(blob); }
+                assets.delete(f.name);
+                row.remove();
+                // Перезапустить предпросмотр, чтобы карта ресурсов обновилась
+                run();
+              }catch(e){ console.error(e); }
+            });
+            list.appendChild(row);
+          });
+          // после добавления — перезапустить, чтобы подхватить новые ссылки
+          run();
+        }
+        function toggleAssetsBar(){
+          const bar=document.getElementById('assetsBar');
+          bar.classList.toggle('hidden');
+          if(!bar.classList.contains('hidden') && assets.size===0){
+            document.getElementById('assetsInput').click();
+          }
+        }
+        function replaceAssetUrls(str){
+          if(!str||assets.size===0) return str;
+          assets.forEach((blob,name)=>{
+            const esc=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+            const rx1=new RegExp('url\\((\"|\\'+"'"+'|)assets/'+esc+'(\\1)\\)','g');
+            const rx2=new RegExp('([\"\\'+"'"+'])assets/'+esc+'\\1','g');
+            str=str.replace(rx1, m=>m.replace('assets/'+name, blob))
+                   .replace(rx2, m=>m.replace('assets/'+name, blob));
+          });
+          return str;
+        }
+        function runtimeMapperScript(){
+          var mapObj={}; assets.forEach(function(v,k){ mapObj[k]=v; });
+          var json=JSON.stringify(mapObj);
+          var s="(function(){";
+          s+="var MAP="+json+";";
+          s+="function res(u){try{if(!u)return u;if(u.indexOf('assets/')===0){var k=u.slice(7);if(MAP[k])return MAP[k]}if(u.indexOf('/assets/')===0){var k2=u.slice(8);if(MAP[k2])return MAP[k2]}return u}catch(e){return u}}";
+          s+="function patch(root){var sels=['img','script','link','video','audio','source','iframe'];for(var i=0;i<sels.length;i++){var sel=sels[i];var nodes=root.querySelectorAll(sel);for(var j=0;j<nodes.length;j++){var el=nodes[j];var attr=(sel==='link')?'href':'src';if(el.hasAttribute(attr)){var val=el.getAttribute(attr);var r=res(val);if(r!==val)el.setAttribute(attr,r);}}}}";
+          s+="document.addEventListener('DOMContentLoaded',function(){patch(document);var mo=new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i];if(m.addedNodes){for(var k=0;k<m.addedNodes.length;k++){var n=m.addedNodes[k];if(n.querySelectorAll)patch(n);}}}});mo.observe(document.documentElement,{childList:true,subtree:true});});";
+          s+="var _f=window.fetch.bind(window);window.fetch=function(input,init){if(typeof input==='string'){input=res(input);}else if(input&&input.url){input=new Request(res(input.url),input);}return _f(input,init)};";
+          s+="var _o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){return _o.call(this,m,res(u),arguments[2],arguments[3],arguments[4])};";
+          s+="})();";
+          return s;
+        }
+
+        function hookDropzone(){
+          const dz=document.getElementById('dropzone');
+          ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();dz.classList.add('drag');}));
+          ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();dz.classList.remove('drag');}));
+          dz.addEventListener('drop',e=>{ if(e.dataTransfer && e.dataTransfer.files){ addAssets(e.dataTransfer.files); } });
+        }
+
+        // Preview
+        function updateViewportScale(){
+          const area=document.getElementById('previewArea');
+          const dims=getDims();
+          const viewport=document.getElementById('viewport');
+          viewport.style.width=dims.w+'px';
+          viewport.style.height=dims.h+'px';
+          const availW=area.clientWidth;
+          const scale=Math.max(0.1, Math.min(1, availW/dims.w));
+          viewport.style.transform='scale('+scale+')';
+          area.style.height=Math.ceil(dims.h*scale)+'px';area.style.minHeight='unset';
+          document.getElementById('scaleBadge').textContent=dims.w+'×'+dims.h+' @'+Math.round(scale*100)+'%';
+          document.getElementById('sizeBadge').textContent='Предпросмотр • '+label();
+        }
+
+        function buildSrcDoc(){
+          var html=cmHtml.getValue();
+          var css =cmCss.getValue();
+          var js  =cmJs.getValue();
+          function esc(s){return s.replace(/<\/script>/gi,'<\\/script>');}
+          html=replaceAssetUrls(html);
+          css =replaceAssetUrls(css);
+          var mapper=runtimeMapperScript();
+          var src='<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+          src+='<style>html,body{background:transparent;}'+esc(css)+'</style></head><body>';
+          src+=html;
+          src+='<script>'+mapper+'<\/script>';
+          src+='<script>(function(){var p=window.parent;function post(t,a){try{p.postMessage({__sandboxLog:true,type:t,payload:a},"*")}catch(e){}}["log","info","warn","error"].forEach(function(fn){var o=console[fn].bind(console);console[fn]=function(){var arr=[];for(var i=0;i<arguments.length;i++){try{arr.push(typeof arguments[i]==="object"?JSON.stringify(arguments[i]):String(arguments[i]))}catch(e){arr.push(String(arguments[i]))}}post(fn,arr);o.apply(console,arguments);};});window.addEventListener("error",function(e){post("error",[(e&&e.message)||"Error",e.filename?e.filename+":"+e.lineno+":"+e.colno:""]);});})();<\/script>';
+          src+='<script>try{'+js+'}catch(e){console.error(e&&e.stack?e.stack:e.toString());}<\/script></body></html>';
+          return src;
+        }
+        function run(){
+          document.getElementById('preview').srcdoc=buildSrcDoc();
+        }
+
+        // Console
+        function log(level,text){
+          const out=document.getElementById('consoleOut');
+          const div=document.createElement('div');
+          div.className=level==='error'?'text-red-600 dark:text-red-400':level==='warn'?'text-yellow-700 dark:text-yellow-300':level==='info'?'text-sky-700 dark:text-sky-300':'text-slate-700 dark:text-slate-200';
+          div.innerHTML='<span class="opacity-60">['+level+']</span> '+text;
+          out.appendChild(div); out.scrollTop=out.scrollHeight;
+        }
+        function clearLogs(){document.getElementById('consoleOut').innerHTML='';}
+        window.addEventListener('message',function(e){var d=e.data;if(!d||!d.__sandboxLog) return; log(d.type,(d.payload||[]).join(' '));});
+
+        document.addEventListener('DOMContentLoaded',function(){
+          initEditors();
+          applyTheme(initialTheme());
+          switchTab('html');
+          run();
+
+          document.getElementById('themeToggle').addEventListener('click',function(){
+            const isDark=document.documentElement.classList.contains('dark')||document.body.classList.contains('dark');
+            applyTheme(isDark?'light':'dark');
+          });
+          document.querySelectorAll('.tab-btn').forEach(function(b){ b.addEventListener('click', function(){ switchTab(b.getAttribute('data-tab')); }); });
+          document.getElementById('runBtn').addEventListener('click', run);
+          document.getElementById('exportBtn').addEventListener('click', exportProject);
+          document.getElementById('importBtn').addEventListener('click', function(){ document.getElementById('fileInput').click(); });
+          document.getElementById('fileInput').addEventListener('change', function(e){ var f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) importProject(f).catch(function(err){ alert('Импорт не удался: '+(err.message||err)); }); });
+          document.getElementById('clearConsole').addEventListener('click', clearLogs);
+          document.getElementById('fontSizeRange').addEventListener('input', function(e){ var px=parseInt(e.target.value,10); localStorage.setItem(LS.fontSize,px); setEditorFontSize(px); });
+
+          document.getElementById('deviceProfile').value=currentProfile;
+          document.getElementById('deviceProfile').addEventListener('change', function(e){
+            currentProfile=e.target.value; localStorage.setItem(LS.profile,currentProfile); updateViewportScale();
+          });
+
+          // Assets UI
+          document.getElementById('assetsBtn').addEventListener('click', toggleAssetsBar);
+          document.getElementById('assetsAddBtn').addEventListener('click', function(){ document.getElementById('assetsInput').click(); });
+          document.getElementById('assetsInput').addEventListener('change', function(e){ var fs=e.target.files; if(fs&&fs.length){ addAssets(fs); e.target.value=''; } });
+          hookDropzone();
+
+          const ro=new ResizeObserver(updateViewportScale);
+          ro.observe(document.getElementById('previewArea'));
+          window.addEventListener('resize', updateViewportScale);
+          updateViewportScale();
+
+          window.addEventListener('keydown', function(e){ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='enter'){ e.preventDefault(); run(); } });
+        });
+
+        function setActiveTabButton(tab){
+          document.querySelectorAll('.tab-btn').forEach(function(btn){
+            var a=btn.getAttribute('data-tab')===tab;
+            btn.classList.toggle('border-indigo-600',a);
+            btn.classList.toggle('text-indigo-700',a);
+            btn.classList.toggle('bg-indigo-50',a);
+            btn.classList.toggle('dark:border-indigo-500',a);
+            btn.classList.toggle('dark:text-indigo-300',a);
+            btn.classList.toggle('dark:bg-slate-800',a);
+            btn.classList.toggle('border-transparent',!a);
+          });
+        }
+        function switchTab(tab){
+          setActiveTabButton(tab);
+          ['html','css','js'].forEach(function(name){
+            var el=document.getElementById(name+'Host');
+            if(name===tab) el.classList.remove('hidden-el'); else el.classList.add('hidden-el');
+          });
+          setTimeout(function(){ if(tab==='html') cmHtml.refresh(); if(tab==='css') cmCss.refresh(); if(tab==='js') cmJs.refresh(); },0);
+        }
+
+        function exportProject(){
+          var payload={version:1,html:cmHtml.getValue(),css:cmCss.getValue(),js:cmJs.getValue(),exportedAt:new Date().toISOString()};
+          var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+          var url=URL.createObjectURL(blob);
+          var a=document.createElement('a'); a.href=url; a.download='playground-project-'+Date.now()+'.json'; a.click();
+          URL.revokeObjectURL(url);
+        }
+        async function importProject(file){
+          const text=await file.text(); const data=JSON.parse(text);
+          if(!data || typeof data.html!=='string' || typeof data.css!=='string' || typeof data.js!=='string') throw new Error('Неверный формат файла');
+          cmHtml.setValue(data.html); cmCss.setValue(data.css); cmJs.setValue(data.js);
+          run();
+        }
+      })();
+    </script>
+  </body>
+</html>
