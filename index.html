@@ -33,9 +33,9 @@
       .tabs{display:flex;gap:6px;margin-bottom:8px}
       .tab-btn{background:#eef2ff;border:1px solid transparent}
       .tab-btn.active{border-color:#4f46e5;background:#eef2ff}
-      .device-wrapper{position:relative;overflow:auto}
-      .device-badge{position:sticky;top:6px;right:8px;float:right;font-size:10px;opacity:.7;margin:6px 8px 0 0}
-      .device-viewport{transform-origin:top left;background:#fff}
+      .device-wrapper{position:relative;overflow:hidden}
+      .device-badge{position:absolute;top:6px;right:8px;font-size:10px;opacity:.7;z-index:1;pointer-events:none}
+      .device-viewport{transform-origin:top left;background:#fff;overflow:hidden}
       #preview{width:100%;height:100%;border:0}
       .CodeMirror,.simple-editor{height:60vh;border:1px solid #cbd5e1;border-radius:8px}
       @media (min-width:1024px){.CodeMirror,.simple-editor{height:70vh}}
@@ -123,7 +123,7 @@
 
           <section class="panel transition-theme preview-panel">
             <div class="panelHead transition-theme"><span id="sizeBadge" class="opacity-80">Предпросмотр iframe sandbox</span></div>
-            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:auto">
+            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:hidden">
               <div id="scaleBadge" class="device-badge">scale 100%</div>
               <div id="viewport" class="device-viewport">
                 <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-same-origin" referrerpolicy="no-referrer"></iframe>
