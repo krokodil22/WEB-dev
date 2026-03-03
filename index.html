@@ -33,7 +33,7 @@
       .tabs{display:flex;gap:6px;margin-bottom:8px}
       .tab-btn{background:#eef2ff;border:1px solid transparent}
       .tab-btn.active{border-color:#4f46e5;background:#eef2ff}
-      .device-wrapper{position:relative;overflow:auto}
+      .device-wrapper{position:relative;overflow:hidden}
       .device-badge{position:absolute;top:6px;right:8px;font-size:10px;opacity:.7;z-index:1;pointer-events:none}
       .device-viewport{transform-origin:top left;background:#fff;overflow:hidden}
       #preview{width:100%;height:100%;border:0}
@@ -122,15 +122,8 @@
           </section>
 
           <section class="panel transition-theme preview-panel">
-            <div class="panelHead transition-theme">
-              <span id="sizeBadge" class="opacity-80">Предпросмотр iframe sandbox</span>
-              <div class="flex items-center gap-2">
-                <button id="zoomOutBtn" class="text-xs px-2 py-1 rounded" title="Уменьшить масштаб">−</button>
-                <button id="zoomResetBtn" class="text-xs px-2 py-1 rounded" title="Сбросить масштаб">100%</button>
-                <button id="zoomInBtn" class="text-xs px-2 py-1 rounded" title="Увеличить масштаб">+</button>
-              </div>
-            </div>
-            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:auto">
+            <div class="panelHead transition-theme"><span id="sizeBadge" class="opacity-80">Предпросмотр iframe sandbox</span></div>
+            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:hidden">
               <div id="scaleBadge" class="device-badge">scale 100%</div>
               <div id="viewport" class="device-viewport">
                 <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-same-origin" referrerpolicy="no-referrer"></iframe>
@@ -155,7 +148,7 @@
 
     <script>
       (function(){
-        const LS={html:'play_html',css:'play_css',js:'play_js',theme:'theme',fontSize:'editor_fontsize',profile:'device_profile',zoom:'preview_zoom'};
+        const LS={html:'play_html',css:'play_css',js:'play_js',theme:'theme',fontSize:'editor_fontsize',profile:'device_profile'};
         const DEFAULTS={html:'',css:'',js:''};
 
         let cmHtml,cmCss,cmJs;
@@ -222,17 +215,8 @@
 
         const PROFILES={desk1440x900:{w:1440,h:900,label:'Десктоп 1440×900 (16:10)'},tab768x1024:{w:1024,h:768,label:'Планшет 1024×768 (4:3)'},mob375x812:{w:375,h:812,label:'Мобильный 375×812 (iPhone X)'}};
         let currentProfile=localStorage.getItem(LS.profile)||'desk1440x900';
-        let zoomPercent=Math.min(300,Math.max(100,parseInt(localStorage.getItem(LS.zoom)||'100',10)||100));
         function getDims(){return PROFILES[currentProfile]||PROFILES.desk1440x900;}
         function label(){return (PROFILES[currentProfile]||PROFILES.desk1440x900).label;}
-
-        function setZoomPercent(next){
-          zoomPercent=Math.min(300,Math.max(100,next));
-          localStorage.setItem(LS.zoom,zoomPercent);
-          const resetBtn=document.getElementById('zoomResetBtn');
-          if(resetBtn) resetBtn.textContent=zoomPercent+'%';
-          updateViewportScale();
-        }
 
         // Assets
         const assets=new Map(); // name -> {blobUrl,dataUrl}
@@ -349,11 +333,12 @@
           const viewport=document.getElementById('viewport');
           viewport.style.width=dims.w+'px';
           viewport.style.height=dims.h+'px';
-          const scale=Math.max(1,zoomPercent/100);
+          const availW=area.clientWidth;
+          const scale=Math.max(0.1, Math.min(1, availW/dims.w));
           viewport.style.transform='scale('+scale+')';
           area.style.height=Math.ceil(dims.h*scale)+'px';
           area.style.minHeight='unset';
-          document.getElementById('scaleBadge').textContent=dims.w+'×'+dims.h+' @'+Math.round(scale*100)+'% (zoom '+zoomPercent+'%)';
+          document.getElementById('scaleBadge').textContent=dims.w+'×'+dims.h+' @'+Math.round(scale*100)+'%';
           document.getElementById('sizeBadge').textContent='Предпросмотр • '+label();
         }
 
@@ -416,16 +401,6 @@
             currentProfile=e.target.value; localStorage.setItem(LS.profile,currentProfile); updateViewportScale();
           });
 
-          document.getElementById('zoomOutBtn').addEventListener('click', function(){ setZoomPercent(zoomPercent-10); });
-          document.getElementById('zoomInBtn').addEventListener('click', function(){ setZoomPercent(zoomPercent+10); });
-          document.getElementById('zoomResetBtn').addEventListener('click', function(){ setZoomPercent(100); });
-          document.getElementById('previewArea').addEventListener('wheel', function(e){
-            if(!(e.ctrlKey||e.metaKey)) return;
-            e.preventDefault();
-            const delta=e.deltaY<0?10:-10;
-            setZoomPercent(zoomPercent+delta);
-          }, {passive:false});
-
           // Assets UI
           document.getElementById('assetsBtn').addEventListener('click', toggleAssetsBar);
           document.getElementById('assetsAddBtn').addEventListener('click', function(){ document.getElementById('assetsInput').click(); });
@@ -437,17 +412,9 @@
             ro.observe(document.getElementById('previewArea'));
           }
           window.addEventListener('resize', updateViewportScale);
-          setZoomPercent(zoomPercent);
           updateViewportScale();
 
-          window.addEventListener('keydown', function(e){
-            const withCmd=e.metaKey||e.ctrlKey;
-            if(withCmd&&e.key.toLowerCase()==='enter'){ e.preventDefault(); run(); return; }
-            if(!withCmd) return;
-            if(e.key==='+'||e.key==='='||e.key==='Add'){ e.preventDefault(); setZoomPercent(zoomPercent+10); return; }
-            if(e.key==='-'||e.key==='_'||e.key==='Subtract'){ e.preventDefault(); setZoomPercent(zoomPercent-10); return; }
-            if(e.key==='0'){ e.preventDefault(); setZoomPercent(100); }
-          });
+          window.addEventListener('keydown', function(e){ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='enter'){ e.preventDefault(); run(); } });
         });
 
         function setActiveTabButton(tab){
