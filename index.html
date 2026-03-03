@@ -46,6 +46,19 @@
       .dark .chip{background:rgba(15,23,42,.6);border-color:#334155}
       .dark .chip .rm:hover{background:#7f1d1d;color:#fff}
       #consoleOut{max-height:30vh;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:12px;padding:12px;background:#fff}
+      .workbench{display:grid;grid-template-columns:1fr;gap:16px}
+      .editor-panel,.preview-panel{margin-top:0}
+      .preview-panel #previewArea{height:100%}
+      .h-8{height:32px}.w-auto{width:auto}.select-none{user-select:none}
+      .flex{display:flex}.items-center{align-items:center}.gap-2{gap:8px}.gap-3{gap:12px}
+      .text-xs{font-size:12px}.px-2{padding-left:8px;padding-right:8px}.py-1{padding-top:4px;padding-bottom:4px}.rounded{border-radius:8px}
+      .opacity-50{opacity:.5}.opacity-60{opacity:.6}.opacity-80{opacity:.8}
+      .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mr-1{margin-right:4px}.underline{text-decoration:underline}
+      .text-red-600{color:#dc2626}.text-yellow-700{color:#a16207}.text-sky-700{color:#0369a1}.text-slate-700{color:#334155}
+      .dark .text-red-400{color:#f87171}.dark .text-yellow-300{color:#fde047}.dark .text-sky-300{color:#7dd3fc}.dark .text-slate-200{color:#e2e8f0}
+      @media (min-width:1024px){
+        .workbench{grid-template-columns:1fr 1fr}
+      }
     </style>
   </head>
   <body class="h-full transition-theme bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
@@ -80,31 +93,33 @@
           <div id="assetsList" style="margin-top:10px;display:grid;gap:8px"></div>
         </div>
 
-        <section class="panel transition-theme">
-          <div class="panelHead transition-theme">
-            <div class="tabs">
-              <button class="tab-btn" data-tab="html">HTML</button>
-              <button class="tab-btn" data-tab="css">CSS</button>
-              <button class="tab-btn" data-tab="js">JS</button>
+        <div class="workbench">
+          <section class="panel transition-theme editor-panel">
+            <div class="panelHead transition-theme">
+              <div class="tabs">
+                <button class="tab-btn" data-tab="html">HTML</button>
+                <button class="tab-btn" data-tab="css">CSS</button>
+                <button class="tab-btn" data-tab="js">JS</button>
+              </div>
+              <label style="font-size:14px">Кегль <input id="fontSizeRange" class="range" type="range" min="12" max="22" step="1" value="16" /> <span id="fontSizeValue">16px</span></label>
             </div>
-            <label style="font-size:14px">Кегль <input id="fontSizeRange" class="range" type="range" min="12" max="22" step="1" value="16" /> <span id="fontSizeValue">16px</span></label>
-          </div>
-          <div class="panelBody">
-            <div id="htmlHost"></div>
-            <div id="cssHost" class="hidden-el"></div>
-            <div id="jsHost" class="hidden-el"></div>
-          </div>
-        </section>
+            <div class="panelBody">
+              <div id="htmlHost"></div>
+              <div id="cssHost" class="hidden-el"></div>
+              <div id="jsHost" class="hidden-el"></div>
+            </div>
+          </section>
 
-        <section class="panel transition-theme">
-          <div class="panelHead transition-theme"><span id="sizeBadge" class="opacity-80">Предпросмотр iframe sandbox</span></div>
-          <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:auto">
-            <div id="scaleBadge" class="device-badge">scale 100%</div>
-            <div id="viewport" class="device-viewport">
-              <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals" referrerpolicy="no-referrer"></iframe>
+          <section class="panel transition-theme preview-panel">
+            <div class="panelHead transition-theme"><span id="sizeBadge" class="opacity-80">Предпросмотр iframe sandbox</span></div>
+            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:auto">
+              <div id="scaleBadge" class="device-badge">scale 100%</div>
+              <div id="viewport" class="device-viewport">
+                <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals" referrerpolicy="no-referrer"></iframe>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section class="transition-theme panel">
           <div class="transition-theme panelHead">
