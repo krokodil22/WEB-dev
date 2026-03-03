@@ -119,7 +119,7 @@
 
           <section class="panel transition-theme preview-panel">
             <div class="panelHead transition-theme"><span id="sizeBadge" class="opacity-80">Предпросмотр iframe sandbox</span></div>
-            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow-x:hidden;overflow-y:auto">
+            <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:hidden">
               <div id="scaleBadge" class="device-badge">scale 100%</div>
               <div id="viewport" class="device-viewport">
                 <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals" referrerpolicy="no-referrer"></iframe>
@@ -211,6 +211,8 @@
 
         const PROFILES={desk1440x900:{w:1440,h:900,label:'Десктоп 1440×900 (16:10)'},tab768x1024:{w:1024,h:768,label:'Планшет 1024×768 (4:3)'},mob375x812:{w:375,h:812,label:'Мобильный 375×812 (iPhone X)'}};
         let currentProfile=localStorage.getItem(LS.profile)||'desk1440x900';
+        let previewContentHeight=0;
+        let previewHeightObserver=null;
         function getDims(){return PROFILES[currentProfile]||PROFILES.desk1440x900;}
         function label(){return (PROFILES[currentProfile]||PROFILES.desk1440x900).label;}
 
@@ -327,14 +329,49 @@
           const area=document.getElementById('previewArea');
           const dims=getDims();
           const viewport=document.getElementById('viewport');
+          const contentHeight=Math.ceil(previewContentHeight||0);
+          const targetHeight=Math.max(1, contentHeight||dims.h);
           viewport.style.width=dims.w+'px';
-          viewport.style.height=dims.h+'px';
+          viewport.style.height=targetHeight+'px';
           const availW=area.clientWidth;
           const scale=Math.max(0.1, Math.min(1, availW/dims.w));
           viewport.style.transform='scale('+scale+')';
-          area.style.height=Math.ceil(dims.h*scale)+'px';area.style.minHeight='unset';
+          area.style.height=Math.ceil(targetHeight*scale)+'px';area.style.minHeight='unset';
           document.getElementById('scaleBadge').textContent=dims.w+'×'+dims.h+' @'+Math.round(scale*100)+'%';
           document.getElementById('sizeBadge').textContent='Предпросмотр • '+label();
+        }
+
+        function measurePreviewContentHeight(){
+          const frame=document.getElementById('preview');
+          try{
+            const doc=frame.contentDocument;
+            if(!doc) return;
+            const b=doc.body;
+            const e=doc.documentElement;
+            const next=Math.max(
+              b?b.scrollHeight:0,
+              b?b.offsetHeight:0,
+              e?e.scrollHeight:0,
+              e?e.offsetHeight:0,
+              e?e.clientHeight:0
+            );
+            if(next && next!==previewContentHeight){
+              previewContentHeight=next;
+              updateViewportScale();
+            }
+          }catch(_){/* ignored */}
+        }
+
+        function observePreviewHeight(){
+          const frame=document.getElementById('preview');
+          try{
+            if(previewHeightObserver){ previewHeightObserver.disconnect(); previewHeightObserver=null; }
+            const doc=frame.contentDocument;
+            if(!doc || !window.ResizeObserver) return;
+            previewHeightObserver=new ResizeObserver(measurePreviewContentHeight);
+            if(doc.documentElement) previewHeightObserver.observe(doc.documentElement);
+            if(doc.body) previewHeightObserver.observe(doc.body);
+          }catch(_){/* ignored */}
         }
 
         function buildSrcDoc(){
@@ -357,6 +394,7 @@
         }
 
         function run(){
+          previewContentHeight=0;
           document.getElementById('preview').srcdoc=buildSrcDoc();
         }
 
@@ -376,6 +414,13 @@
           applyTheme(initialTheme());
           switchTab('html');
           run();
+
+          document.getElementById('preview').addEventListener('load', function(){
+            observePreviewHeight();
+            measurePreviewContentHeight();
+            setTimeout(measurePreviewContentHeight, 0);
+            setTimeout(measurePreviewContentHeight, 120);
+          });
 
           document.getElementById('themeToggle').addEventListener('click',function(){
             const isDark=document.documentElement.classList.contains('dark')||document.body.classList.contains('dark');
