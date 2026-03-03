@@ -32,6 +32,7 @@
       .panelBody{padding:12px}
       .tabs{display:flex;gap:6px;margin-bottom:8px}
       .tab-btn{background:#eef2ff;border:1px solid transparent}
+      .tab-btn.active{border-color:#4f46e5;background:#eef2ff}
       .device-wrapper{position:relative;overflow:hidden}
       .device-badge{position:sticky;top:6px;right:8px;float:right;font-size:10px;opacity:.7;margin:6px 8px 0 0}
       .device-viewport{transform-origin:top left;background:#fff}
@@ -49,10 +50,13 @@
       .chip .rm:hover{background:#fee2e2}
       .dark .header,.dark .panel{background:rgba(30,41,59,.8);border-color:#334155}
       .dark button,.dark select{background:#334155;color:#f1f5f9;border-color:#475569}
+      .dark .tab-btn{background:#1e293b;border-color:transparent}
+      .dark .tab-btn.active{background:#312e81;border-color:#6366f1}
       .dark #runBtn{background:#6366f1}.dark #exportBtn{background:#10b981}
       .dark .chip{background:rgba(15,23,42,.6);border-color:#334155}
       .dark .chip .rm:hover{background:#7f1d1d;color:#fff}
-      #consoleOut{max-height:30vh;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:12px;padding:12px;background:#fff}
+      #consoleOut{max-height:30vh;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:12px;padding:12px;background:#fff;color:#0f172a}
+      .dark #consoleOut{background:#0b1220;color:#e2e8f0;border-top:1px solid #334155}
       .workbench{display:grid;grid-template-columns:1fr;gap:16px}
       .editor-panel,.preview-panel{margin-top:0}
       .preview-panel #previewArea{height:100%}
@@ -458,8 +462,7 @@
         function setActiveTabButton(tab){
           document.querySelectorAll('.tab-btn').forEach(function(btn){
             var a=btn.getAttribute('data-tab')===tab;
-            btn.style.borderColor=a?'#4f46e5':'transparent';
-            btn.style.background=a?'#eef2ff':'';
+            btn.classList.toggle('active',a);
           });
         }
         function switchTab(tab){
