@@ -244,8 +244,8 @@
           if(!str||assets.size===0) return str;
           assets.forEach((blob,name)=>{
             const esc=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-            const rx1=new RegExp('url\\(("|\\'+'\''+'|)assets/'+esc+'(\\1)\\)','g');
-            const rx2=new RegExp('(["\\'+'\''+'])assets/'+esc+'\\1','g');
+            const rx1=new RegExp('url\\((["\\\']?)assets/'+esc+'\\1\\)','g');
+            const rx2=new RegExp('(["\\\'])assets/'+esc+'\\1','g');
             str=str.replace(rx1, m=>m.replace('assets/'+name, blob))
                    .replace(rx2, m=>m.replace('assets/'+name, blob));
           });
@@ -291,16 +291,17 @@
           const html=replaceAssetUrls(cmHtml.getValue());
           const css=replaceAssetUrls(cmCss.getValue());
           const js=replaceAssetUrls(cmJs.getValue());
+          const sandboxBridge='('+function(){
+            (function(){
+              function p(type,args){ parent.postMessage({__sandboxLog:true,type:type,payload:[].slice.call(args).map(function(x){ try{return (typeof x==='object')?JSON.stringify(x):String(x);}catch(e){return String(x);} })},'*'); }
+              ['log','info','warn','error'].forEach(function(k){ var old=console[k]; console[k]=function(){ p(k,arguments); old&&old.apply(console,arguments);} });
+              window.addEventListener('error',function(e){ p('error',[e.message]); });
+              window.addEventListener('unhandledrejection',function(e){ p('error',['UnhandledPromise', (e.reason&&e.reason.message)||String(e.reason)]); });
+            })();
+          }+')();';
 
           return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body>'+html+
-                 '<script>('+function(){
-                   (function(){
-                     function p(type,args){ parent.postMessage({__sandboxLog:true,type:type,payload:[].slice.call(args).map(function(x){ try{return (typeof x==='object')?JSON.stringify(x):String(x);}catch(e){return String(x);} })},'*'); }
-                     ['log','info','warn','error'].forEach(function(k){ var old=console[k]; console[k]=function(){ p(k,arguments); old&&old.apply(console,arguments);} });
-                     window.addEventListener('error',function(e){ p('error',[e.message]); });
-                     window.addEventListener('unhandledrejection',function(e){ p('error',['UnhandledPromise', (e.reason&&e.reason.message)||String(e.reason)]); });
-                   })();
-                 }+')();</script>'+
+                 '<script>'+sandboxBridge+'<\/script>'+
                  '<script>'+runtimeMapperScript()+'<\/script>'+
                  '<script>'+js+'<\/script></body></html>';
         }
