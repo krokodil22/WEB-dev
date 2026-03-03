@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Веб-разработка</title>
     <link rel="icon" href="logo.webp" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
     <meta name="color-scheme" content="dark light" />
     <style>
       html,body{height:100%;margin:0}
@@ -186,9 +193,9 @@
           const j=localStorage.getItem(LS.js);
           const theme=initialTheme()==='dark'?'material-darker':'default';
           if(window.CodeMirror){
-            cmHtml=CodeMirror(document.getElementById('htmlHost'),{value:h??DEFAULTS.html,mode:'htmlmixed',theme,lineNumbers:true,gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'],lint:true});
-            cmCss =CodeMirror(document.getElementById('cssHost'), {value:c??DEFAULTS.css,mode:'css',theme,lineNumbers:true,gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'],lint:true});
-            cmJs  =CodeMirror(document.getElementById('jsHost'),  {value:j??DEFAULTS.js,mode:'javascript',theme,lineNumbers:true,gutters:['CodeMirror-linenumbers','CodeMirror-lint-markers'],lint:{esversion:6}});
+            cmHtml=CodeMirror(document.getElementById('htmlHost'),{value:h??DEFAULTS.html,mode:'htmlmixed',theme,lineNumbers:true});
+            cmCss =CodeMirror(document.getElementById('cssHost'), {value:c??DEFAULTS.css,mode:'css',theme,lineNumbers:true});
+            cmJs  =CodeMirror(document.getElementById('jsHost'),  {value:j??DEFAULTS.js,mode:'javascript',theme,lineNumbers:true});
           }else{
             cmHtml=createSimpleEditor(document.getElementById('htmlHost'),h??DEFAULTS.html);
             cmCss=createSimpleEditor(document.getElementById('cssHost'),c??DEFAULTS.css);
@@ -208,20 +215,31 @@
         function label(){return (PROFILES[currentProfile]||PROFILES.desk1440x900).label;}
 
         // Assets
-        const assets=new Map(); // name -> blobURL
-        function addAssets(files){
+        const assets=new Map(); // name -> {blobUrl,dataUrl}
+        function fileToDataUrl(file){
+          return new Promise((resolve,reject)=>{
+            const reader=new FileReader();
+            reader.onload=()=>resolve(reader.result);
+            reader.onerror=()=>reject(reader.error||new Error('Не удалось прочитать файл'));
+            reader.readAsDataURL(file);
+          });
+        }
+        async function addAssets(files){
           const list=document.getElementById('assetsList');
-          Array.from(files).forEach(f=>{
-            const old=assets.get(f.name); if(old){ URL.revokeObjectURL(old); }
-            const url=URL.createObjectURL(f); assets.set(f.name,url);
+          for(const f of Array.from(files)){
+            const old=assets.get(f.name);
+            if(old&&old.blobUrl){ URL.revokeObjectURL(old.blobUrl); }
+            const blobUrl=URL.createObjectURL(f);
+            const dataUrl=await fileToDataUrl(f);
+            assets.set(f.name,{blobUrl,dataUrl});
             const row=document.createElement('div');
             row.className='chip';
-            row.innerHTML='<div class="truncate"><b class="mr-1">'+f.name+'</b><span class="opacity-60">('+Math.ceil(f.size/1024)+' KB)</span><div class="text-xs opacity-80">assets/'+f.name+'</div></div><div class="flex items-center gap-2"><a class="text-xs underline" href="'+url+'" target="_blank">просмотр</a><button class="rm" title="Удалить" aria-label="Удалить">✕</button></div>';
+            row.innerHTML='<div class="truncate"><b class="mr-1">'+f.name+'</b><span class="opacity-60">('+Math.ceil(f.size/1024)+' KB)</span><div class="text-xs opacity-80">assets/'+f.name+'</div></div><div class="flex items-center gap-2"><a class="text-xs underline" href="'+blobUrl+'" target="_blank">просмотр</a><button class="rm" title="Удалить" aria-label="Удалить">✕</button></div>';
             // remove handler
             row.querySelector('.rm').addEventListener('click',function(){
               try{
-                const blob=assets.get(f.name);
-                if(blob){ URL.revokeObjectURL(blob); }
+                const asset=assets.get(f.name);
+                if(asset&&asset.blobUrl){ URL.revokeObjectURL(asset.blobUrl); }
                 assets.delete(f.name);
                 row.remove();
                 // Перезапустить предпросмотр, чтобы карта ресурсов обновилась
@@ -229,7 +247,7 @@
               }catch(e){ console.error(e); }
             });
             list.appendChild(row);
-          });
+          }
           // после добавления — перезапустить, чтобы подхватить новые ссылки
           run();
         }
@@ -242,21 +260,53 @@
         }
         function replaceAssetUrls(str){
           if(!str||assets.size===0) return str;
-          assets.forEach((blob,name)=>{
+          assets.forEach((asset,name)=>{
+            const url=asset.dataUrl;
             const esc=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-            const rx1=new RegExp('url\\((["\\\']?)assets/'+esc+'\\1\\)','g');
-            const rx2=new RegExp('(["\\\'])assets/'+esc+'\\1','g');
-            str=str.replace(rx1, m=>m.replace('assets/'+name, blob))
-                   .replace(rx2, m=>m.replace('assets/'+name, blob));
+            const rx1=new RegExp('url\\((["\\\']?)(?:\\.?\\/)?assets/'+esc+'\\1\\)','g');
+            const rx2=new RegExp('(["\\\'])(?:\\.?\\/)?assets/'+esc+'\\1','g');
+            str=str.replace(rx1, 'url($1'+url+'$1)')
+                   .replace(rx2, '$1'+url+'$1');
           });
           return str;
         }
+        function assetUrlByPath(path){
+          if(!path) return null;
+          const normalized=path.split('?')[0].split('#')[0].replace(/^\.\//,'').replace(/^\//,'');
+          if(!normalized.startsWith('assets/')) return null;
+          const asset=assets.get(normalized.slice('assets/'.length));
+          return asset?asset.dataUrl:null;
+        }
+        function replaceAssetUrlsInHtml(html){
+          if(!html||assets.size===0) return html;
+          const doc=new DOMParser().parseFromString('<!doctype html><html><body>'+html+'</body></html>','text/html');
+          doc.querySelectorAll('*').forEach(el=>{
+            ['src','href','poster'].forEach(attr=>{
+              const val=el.getAttribute(attr);
+              const assetUrl=assetUrlByPath(val);
+              if(assetUrl) el.setAttribute(attr,assetUrl);
+            });
+            const srcset=el.getAttribute('srcset');
+            if(srcset){
+              const next=srcset.split(',').map(part=>{
+                const t=part.trim();
+                if(!t) return t;
+                const chunks=t.split(/\s+/);
+                const assetUrl=assetUrlByPath(chunks[0]);
+                if(assetUrl) chunks[0]=assetUrl;
+                return chunks.join(' ');
+              }).join(', ');
+              el.setAttribute('srcset',next);
+            }
+          });
+          return doc.body.innerHTML;
+        }
         function runtimeMapperScript(){
-          var mapObj={}; assets.forEach(function(v,k){ mapObj[k]=v; });
+          var mapObj={}; assets.forEach(function(v,k){ mapObj[k]=v.dataUrl; });
           var json=JSON.stringify(mapObj);
           var s="(function(){";
           s+="var MAP="+json+";";
-          s+="function res(u){try{if(!u)return u;if(u.indexOf('assets/')===0){var k=u.slice(7);if(MAP[k])return MAP[k]}if(u.indexOf('/assets/')===0){var k2=u.slice(8);if(MAP[k2])return MAP[k2]}return u}catch(e){return u}}";
+          s+="function res(u){try{if(!u)return u;var clean=u.split('?')[0].split('#')[0];if(clean.indexOf('./')===0)clean=clean.slice(2);if(clean.indexOf('/')===0)clean=clean.slice(1);if(clean.indexOf('assets/')===0){var k=clean.slice(7);if(MAP[k])return MAP[k]}return u}catch(e){return u}}";
           s+="function patch(root){var sels=['img','script','link','video','audio','source','iframe'];for(var i=0;i<sels.length;i++){var sel=sels[i];var nodes=root.querySelectorAll(sel);for(var j=0;j<nodes.length;j++){var el=nodes[j];var attr=(sel==='link')?'href':'src';if(el.hasAttribute(attr)){var val=el.getAttribute(attr);var r=res(val);if(r!==val)el.setAttribute(attr,r);}}}}";
           s+="document.addEventListener('DOMContentLoaded',function(){patch(document);var mo=new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i];if(m.addedNodes){for(var k=0;k<m.addedNodes.length;k++){var n=m.addedNodes[k];if(n.querySelectorAll)patch(n);}}}});mo.observe(document.documentElement,{childList:true,subtree:true});});";
           s+="var _f=window.fetch.bind(window);window.fetch=function(input,init){if(typeof input==='string'){input=res(input);}else if(input&&input.url){input=new Request(res(input.url),input);}return _f(input,init)};";
@@ -288,7 +338,7 @@
         }
 
         function buildSrcDoc(){
-          const html=replaceAssetUrls(cmHtml.getValue());
+          const html=replaceAssetUrlsInHtml(cmHtml.getValue());
           const css=replaceAssetUrls(cmCss.getValue());
           const js=replaceAssetUrls(cmJs.getValue());
           const sandboxBridge='('+function(){
