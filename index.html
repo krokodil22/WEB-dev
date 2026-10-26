@@ -26,6 +26,12 @@
       button,select,input[type="file"]{font:inherit}
       button,select{border:1px solid #cbd5e1;background:#e2e8f0;color:#0f172a;padding:8px 12px;border-radius:10px;cursor:pointer}
       button:hover,select:hover{filter:brightness(.97)}
+      #layoutToggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:8px;box-sizing:border-box}
+      #layoutToggle svg{display:block;transition:transform .15s ease}
+      #layoutToggle[aria-pressed="true"]{background:#eef2ff;border-color:#6366f1}
+      #layoutToggle[aria-pressed="true"] svg{transform:rotate(90deg)}
+      .dark #layoutToggle[aria-pressed="true"]{background:#312e81;border-color:#818cf8}
+      @media (prefers-reduced-motion:reduce){#layoutToggle svg{transition:none}}
       #runBtn,#exportBtn{color:#fff;border:0}
       #runBtn{background:#4f46e5} #exportBtn{background:#059669}
       .hidden{display:none}
@@ -99,10 +105,9 @@
           </div>
           <div class="toolbar">
             <button id="themeToggle" class="transition-theme">🌞 Светлая</button>
-            <select id="layoutSelect" class="transition-theme" aria-label="Расположение окон" title="Расположение редактора и эмулятора">
-              <option value="horizontal">↔ Слева–справа</option>
-              <option value="vertical">↕ Сверху–снизу</option>
-            </select>
+            <button id="layoutToggle" type="button" class="transition-theme" aria-label="Вертикальное расположение окон" aria-pressed="false" title="Расположить окна сверху вниз">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16M8 8l-4 4 4 4m8-8 4 4-4 4" /></svg>
+            </button>
             <select id="deviceProfile" class="transition-theme">
               <option value="desk1440x900">Десктоп 1440×900 (16:10)</option>
               <option value="tab768x1024">Планшет 1024×768 (4:3)</option>

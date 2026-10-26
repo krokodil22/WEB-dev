@@ -14,7 +14,10 @@ const assert = require('node:assert/strict');
     const editor = page.locator('#editorPanel');
     const preview = page.locator('#previewPanel');
     const divider = page.getByRole('separator');
-    const layout = page.getByRole('combobox',{name:'Расположение окон'});
+    const layout = page.getByRole('button',{name:'Вертикальное расположение окон'});
+    async function setLayout(value) {
+      if ((await layout.getAttribute('aria-pressed') === 'true') !== (value === 'vertical')) await layout.click();
+    }
     async function box(locator) { return locator.boundingBox(); }
     async function drag(dx,dy) {
       await divider.scrollIntoViewIfNeeded();
@@ -28,10 +31,20 @@ const assert = require('node:assert/strict');
       await page.waitForFunction(()=>!document.getElementById('workbench').classList.contains('resizing'));
     }
     assert.equal(await page.getByRole('button',{name:/Стоп/}).count(),0);
-    assert.equal(await layout.inputValue(),'horizontal');
+    assert.equal(await layout.getAttribute('aria-pressed'),'false');
     let e = await box(editor), p = await box(preview);
     assert.ok(Math.abs(e.y-p.y)<2 && p.x>e.x+e.width);
-    pass('Stop removed; desktop defaults to side-by-side panes');
+    assert.equal((await layout.innerText()).trim(),'');
+    assert.equal(await layout.locator('svg').count(),1);
+    // Native button activation must work with both Space and Enter.
+    await layout.focus();
+    await page.keyboard.press('Space');
+    assert.equal(await layout.getAttribute('aria-pressed'),'true');
+    assert.equal(await page.locator('#workbench').getAttribute('data-layout'),'vertical');
+    await page.keyboard.press('Enter');
+    assert.equal(await layout.getAttribute('aria-pressed'),'false');
+    assert.equal(await page.locator('#workbench').getAttribute('data-layout'),'horizontal');
+    pass('icon-only toggle works with keyboard and desktop defaults to side-by-side panes');
 
     await page.evaluate(()=>{
       const html=document.querySelector('#htmlHost textarea');html.value='<h1 id="layout-result">preview survives</h1>';html.dispatchEvent(new Event('input'));
@@ -59,7 +72,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#jsHost textarea').inputValue(),'console.log("layout-ready")');
     pass('width and source code persist after reload');
 
-    await layout.selectOption('vertical');
+    await setLayout('vertical');
     e=await box(editor);p=await box(preview);
     assert.ok(p.y>e.y+e.height && Math.abs(p.x-e.x)<2 && Math.abs(e.width-p.width)<2);
     assert.equal(await divider.getAttribute('aria-orientation'),'horizontal');
@@ -68,11 +81,11 @@ const assert = require('node:assert/strict');
     assert.ok((await box(editor)).height>beforeHeight+100);
     const savedHeight=(await box(editor)).height;
     await page.reload();
-    assert.equal(await layout.inputValue(),'vertical');
+    assert.equal(await layout.getAttribute('aria-pressed'),'true');
     assert.ok(Math.abs((await box(editor)).height-savedHeight)<2);
     pass('stacked layout, vertical drag and height persist after reload');
 
-    await layout.selectOption('horizontal');
+    await setLayout('horizontal');
     assert.ok(Math.abs((await box(editor)).width-savedWidth)<2);
     await divider.focus();
     const beforeKey=(await box(editor)).width;
@@ -85,23 +98,23 @@ const assert = require('node:assert/strict');
     await divider.dblclick();
     e=await box(editor);p=await box(preview);
     assert.ok(Math.abs(e.width-p.width)<2,'double click restores equal widths');
-    await layout.selectOption('vertical');
+    await setLayout('vertical');
     assert.ok(Math.abs((await box(editor)).height-savedHeight)<2,'each orientation retains own dimension');
     pass('independent dimensions, keyboard sizing, bounds and double-click reset');
 
     await page.evaluate(()=>localStorage.removeItem('workspace_layout'));
     await page.setViewportSize({width:390,height:844});
     await page.reload();
-    assert.equal(await layout.inputValue(),'vertical');
+    assert.equal(await layout.getAttribute('aria-pressed'),'true');
     e=await box(editor);p=await box(preview);
     assert.ok(p.y>e.y+e.height);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-    await layout.selectOption('horizontal');
+    await setLayout('horizontal');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     pass('small screen defaults to stacked panes and both layouts avoid page overflow');
 
     await page.setViewportSize({width:1440,height:1000});
-    await layout.selectOption('horizontal');
+    await setLayout('horizontal');
     await divider.scrollIntoViewIfNeeded();
     const rect=await box(divider);
     await page.mouse.move(rect.x+rect.width/2,rect.y+100);
@@ -113,7 +126,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#preview').evaluate(el=>getComputedStyle(el).pointerEvents),'auto');
     pass('interrupted drag restores iframe input');
     await page.screenshot({path:'/tmp/web-dev-layout-horizontal.png',fullPage:true});
-    await layout.selectOption('vertical');
+    await setLayout('vertical');
     await page.screenshot({path:'/tmp/web-dev-layout-vertical.png',fullPage:true});
     assert.deepEqual(errors,[]);
     console.log(`${passed} layout checks passed; no page errors.`);

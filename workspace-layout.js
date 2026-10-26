@@ -4,7 +4,7 @@
     const workbench = document.getElementById('workbench');
     const editor = document.getElementById('editorPanel');
     const splitter = document.getElementById('panelSplitter');
-    const select = document.getElementById('layoutSelect');
+    const toggle = document.getElementById('layoutToggle');
     const keys = { layout: 'workspace_layout', share: 'workspace_editor_share', height: 'workspace_editor_height' };
     function read(key) { try { return localStorage.getItem(key); } catch { return null; } }
     function write(key, value) { try { localStorage.setItem(key, value); } catch {} }
@@ -28,8 +28,9 @@
     }
     function apply() {
       workbench.dataset.layout = layout;
-      select.value = layout;
       const horizontal = layout === 'horizontal';
+      toggle.setAttribute('aria-pressed', String(!horizontal));
+      toggle.title = horizontal ? 'Расположить окна сверху вниз' : 'Расположить окна слева направо';
       const range = horizontal ? bounds() : { min: 220, max: 1600 };
       const value = horizontal ? clamp(share, range.min, range.max) : height;
       const trackShare = horizontal ? value : share;
@@ -65,9 +66,9 @@
       if (splitter.hasPointerCapture(id)) splitter.releasePointerCapture(id);
       saveSize();
     }
-    select.addEventListener('change', function () {
+    toggle.addEventListener('click', function () {
       finish();
-      layout = select.value;
+      layout = layout === 'horizontal' ? 'vertical' : 'horizontal';
       write(keys.layout, layout);
       apply();
     });
