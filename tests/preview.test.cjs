@@ -8,6 +8,12 @@ const { performance } = require('node:perf_hooks');
   const pass = name => { passed++; console.log('PASS', name); };
   try {
     const page = await browser.newPage();
+    let activeWorker;
+    page.on('worker', worker => {
+      const tracked = {worker, closed:false};
+      worker.on('close', () => { tracked.closed = true; });
+      activeWorker = tracked;
+    });
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     await page.route('https://cdnjs.cloudflare.com/**', route => route.abort());
@@ -30,6 +36,13 @@ const { performance } = require('node:perf_hooks');
         error.message += '\nActual console output:\n' + await page.locator('#consoleOut').innerText();
         throw error;
       }
+    }
+    async function workerStopped() {
+      const tracked = activeWorker;
+      assert.ok(tracked, 'execution must have created a worker');
+      if (!tracked.closed) await tracked.worker.waitForEvent('close', {timeout:6000});
+      assert.ok(!page.workers().includes(tracked.worker), 'runaway worker must actually terminate');
+      assert.doesNotMatch(await page.locator('#consoleOut').innerText(), /превышен лимит времени/i);
     }
     async function responsive() {
       const start = performance.now();
@@ -59,7 +72,7 @@ for (let i = 0; i < 3; i += 1) {
     await run('console.log("armed"); setTimeout(()=>{console.log("started-late");while(true){}},1600);');
     await consoleHas('started-late');
     await responsive();
-    await consoleHas('лимит времени');
+    await workerStopped();
     pass('watchdog remains active after initial code returns and stops a delayed infinite loop');
 
     const badCode = 'console.log("should-not-autostart"); while(true){}';
@@ -92,7 +105,7 @@ for (let i = 0; i < 3; i += 1) {
       await run('console.log("started");' + js);
       await consoleHas('started');
       await responsive();
-      await consoleHas('лимит времени');
+      await workerStopped();
       pass('UI responsive during runaway worker, then terminated: ' + js);
     }
     await run('function recurse(){recurse()} recurse();');
@@ -103,13 +116,13 @@ for (let i = 0; i < 3; i += 1) {
     await run('', '<script>console.log("started"); while(true){}<\/script>');
     await consoleHas('started');
     await responsive();
-    await consoleHas('лимит времени');
+    await workerStopped();
     pass('inline HTML scripts execute only in worker');
 
     await run('console.log("started");while(true){console.log(1)}');
     await consoleHas('started');
     await responsive();
-    await consoleHas('лимит времени');
+    await workerStopped();
     assert.ok(await page.locator('#consoleOut > div').count() <= 111);
     pass('console flood cannot freeze editor');
 
@@ -140,7 +153,7 @@ for (let i = 0; i < 3; i += 1) {
     await preview.locator('#hang').click();
     await consoleHas('started');
     await responsive();
-    await consoleHas('лимит времени');
+    await workerStopped();
     pass('inline event handler runs in worker, not rendering frame');
 
     await run('document.addEventListener("click",()=>console.log("preview-document-click"));console.log("ready");');

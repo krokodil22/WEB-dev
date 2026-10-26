@@ -1,6 +1,7 @@
 import { upgrade } from './vendor/worker-dom/main.mjs';
 
 const TIMEOUT = 1200;
+const MAX_TIMER_GAP = 500;
 const BLOCKED_ELEMENTS = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'BASE', 'META']);
 let runtime;
 function workerRuntime() {
@@ -9,6 +10,19 @@ function workerRuntime() {
       if (!response.ok) throw new Error('Не удалось загрузить среду выполнения JavaScript.');
       return response.text();
     }).catch(error => { runtime = null; throw error; });
+}
+
+// Stop computation without erasing the last rendered document or adding a
+// service message to the user's console. A subsequent Run creates a new worker.
+function terminateSession(session) {
+  session.stopped = true;
+  clearInterval(session.watchdog);
+  session.cleanupWatchdog?.();
+  session.controller?.terminate();
+  if (session.worker) {
+    session.worker.onmessage = null;
+    session.worker.onerror = null;
+  }
 }
 
 // This entire function is serialized into the worker, never called on the UI thread.
@@ -80,9 +94,7 @@ export class PreviewRunner {
     const session = this.session;
     this.session = null;
     if (!session) return;
-    clearInterval(session.watchdog);
-    session.controller?.terminate();
-    if (session.worker) session.worker.onmessage = null;
+    terminateSession(session);
     // Event listeners installed by WorkerDOM are owned by this disposable frame.
     session.frame.remove();
   }
@@ -95,7 +107,7 @@ export class PreviewRunner {
     // Rendering only: user JS is NEVER allowed to execute in this document.
     frame.setAttribute('sandbox', 'allow-same-origin');
     frame.referrerPolicy = 'no-referrer';
-    const session = { frame, lastPong: performance.now(), pending: null, messages: 0, incoming: 0 };
+    const session = { frame, pending: null, pingSentAt: null, messages: 0, incoming: 0, stopped: false };
     this.session = session;
     if (previous) previous.replaceWith(frame);
     else document.getElementById('viewport').appendChild(frame);
@@ -178,7 +190,7 @@ export class PreviewRunner {
         // DOM, events and geometry only; never execute arbitrary objects or write editor storage.
         executorsAllowed: [0, 1, 2, 3, 4, 5],
         mutationPump: flush => requestAnimationFrame(() => {
-          if (this.session === session) flush();
+          if (this.session === session && !session.stopped) flush();
         })
       });
       if (this.session !== session) { session.controller?.terminate(); return; }
@@ -197,7 +209,7 @@ export class PreviewRunner {
           if (data.kind === 'limit') { fail('Предпросмотр остановлен: слишком много сообщений.'); return; }
           if (data.kind === 'pong' && data.sequence === session.pending) {
             session.pending = null;
-            session.lastPong = performance.now();
+            session.pingSentAt = null;
           } else if (data.kind === 'log' && ['log','info','warn','error'].includes(data.level)) {
             if (++session.messages > 110) { fail('Предпросмотр остановлен: слишком много сообщений.'); return; }
             this.log(data.level, String(data.text).slice(0,20000));
@@ -217,19 +229,44 @@ export class PreviewRunner {
         try { applyMutation(event); } catch (error) { fail(error.message); }
       };
       worker.onerror = event => { event.preventDefault(); fail(event.message || 'Ошибка выполнения JavaScript.'); };
-      session.lastPong = performance.now();
       let sequence = 0;
+      const resetProbe = () => {
+        session.pending = null;
+        session.pingSentAt = null;
+        session.lastTick = performance.now();
+      };
+      // Browsers suspend/throttle workers and timers in hidden tabs and during
+      // sleep. Probe again after resuming instead of timing an inactive page.
+      document.addEventListener('visibilitychange', resetProbe);
+      document.addEventListener('freeze', resetProbe);
+      document.addEventListener('resume', resetProbe);
+      window.addEventListener('pageshow', resetProbe);
+      session.cleanupWatchdog = () => {
+        document.removeEventListener('visibilitychange', resetProbe);
+        document.removeEventListener('freeze', resetProbe);
+        document.removeEventListener('resume', resetProbe);
+        window.removeEventListener('pageshow', resetProbe);
+      };
+      resetProbe();
       session.watchdog = setInterval(() => {
-        if (this.session !== session) return;
+        if (this.session !== session || session.stopped) return;
         session.incoming = 0;
-        if (performance.now() - session.lastPong > TIMEOUT) {
-          fail('Выполнение остановлено: превышен лимит времени. Проверьте циклы. Код сохранён — исправьте его и нажмите «Запуск».');
+        const now = performance.now();
+        const timerGap = now - session.lastTick;
+        session.lastTick = now;
+        if (document.visibilityState !== 'visible' || timerGap > MAX_TIMER_GAP) {
+          resetProbe();
           return;
         }
-        if (session.pending === null) {
-          session.pending = ++sequence;
-          worker.postMessage({channel,kind:'ping',sequence});
+        // Only an unanswered probe on an actively scheduled page can time out.
+        // Idle time since the last reply says nothing about the worker's health.
+        if (session.pending !== null) {
+          if (now - session.pingSentAt > TIMEOUT) terminateSession(session);
+          return;
         }
+        session.pending = ++sequence;
+        session.pingSentAt = now;
+        worker.postMessage({channel,kind:'ping',sequence});
       }, 100);
     } catch (error) { fail(error.message); }
   }
