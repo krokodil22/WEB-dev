@@ -158,13 +158,12 @@ for (let i = 0; i < 3; i += 1) {
 
     await run('console.log("started");while(true){}');
     await consoleHas('started');
-    const stopTime = performance.now();
-    await page.click('#stopBtn', {timeout:700});
-    assert.ok(performance.now()-stopTime < 700, 'Stop must terminate busy worker immediately');
-    await consoleHas('Предпросмотр остановлен');
+    assert.equal(await page.locator('#stopBtn').count(), 0);
+    const restartTime = performance.now();
     await run('document.querySelector("#result").textContent="restarted";');
+    assert.ok(performance.now()-restartTime < 700, 'Run must replace the busy worker immediately');
     await preview.locator('#result').filter({hasText:'restarted'}).waitFor();
-    pass('Stop interrupts busy worker immediately; new run succeeds');
+    pass('no Stop button; Run replaces busy worker and new execution succeeds');
 
     await page.locator('#fileInput').setInputFiles({name:'bad-project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({html:'<h1>imported</h1>',css:'',js:'console.log("import-must-not-run"); while(true){}'}))});
     await consoleHas('Проект импортирован');
