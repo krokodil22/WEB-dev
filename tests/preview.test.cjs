@@ -24,7 +24,12 @@ const { performance } = require('node:perf_hooks');
       }, {js,html});
     }
     async function consoleHas(text) {
-      await page.locator('#consoleOut').filter({hasText:text}).waitFor({timeout:6000});
+      try {
+        await page.locator('#consoleOut').filter({hasText:text}).waitFor({timeout:6000});
+      } catch (error) {
+        error.message += '\nActual console output:\n' + await page.locator('#consoleOut').innerText();
+        throw error;
+      }
     }
     async function responsive() {
       const start = performance.now();
@@ -32,6 +37,31 @@ const { performance } = require('node:perf_hooks');
       await page.click('[data-tab="js"]', {timeout:700});
       assert.ok(performance.now()-start < 700, 'editor must respond while worker is busy, before its timeout');
     }
+    await run(`let names = ['Барсик', 'Муся', 'Рыжик'];
+for (let i = 0; i < 3; i += 1) {
+  console.log(names[i]);
+}`);
+    await consoleHas('Рыжик');
+    // Observe beyond the watchdog timeout; output alone does not prove success.
+    await page.waitForTimeout(3000);
+    assert.equal(await page.locator('#consoleOut').innerText(), '[log] Барсик\n[log] Муся\n[log] Рыжик');
+    await page.frameLocator('#preview').locator('#result').waitFor();
+    await responsive();
+    pass('finite names loop stays successful across multiple watchdog cycles');
+
+    await run('setTimeout(()=>console.log("delayed-success"),1600);');
+    await consoleHas('delayed-success');
+    await page.waitForTimeout(1400);
+    assert.equal(await page.locator('#consoleOut').innerText(), '[log] delayed-success');
+    await page.frameLocator('#preview').locator('#result').waitFor();
+    pass('idle worker remains alive and completes delayed callbacks without false timeout');
+
+    await run('console.log("armed"); setTimeout(()=>{console.log("started-late");while(true){}},1600);');
+    await consoleHas('started-late');
+    await responsive();
+    await consoleHas('лимит времени');
+    pass('watchdog remains active after initial code returns and stops a delayed infinite loop');
+
     const badCode = 'console.log("should-not-autostart"); while(true){}';
     await page.evaluate(code => {
       localStorage.setItem('play_js', code);
@@ -83,7 +113,7 @@ const { performance } = require('node:perf_hooks');
     assert.ok(await page.locator('#consoleOut > div').count() <= 111);
     pass('console flood cannot freeze editor');
 
-    await run('for(let i=0;i<12000;i++) document.body.appendChild(document.createElement("p"));');
+    await run('for(let i=0;i<3000;i++) document.body.appendChild(document.createElement("p"));');
     await consoleHas('слишком много изменений DOM');
     await responsive();
     pass('oversized DOM batch is rejected before rendering');

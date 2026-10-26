@@ -14,7 +14,9 @@ function workerRuntime() {
 // This entire function is serialized into the worker, never called on the UI thread.
 function workerBootstrap(sources, handlers, channel) {
   const send = self.postMessage.bind(self);
-  const listen = self.addEventListener.bind(self);
+  // WorkerDOM replaces self.addEventListener with a virtual DOM listener.
+  // Watchdog messages and worker errors must use the saved native transport.
+  const listen = document.addGlobalEventListener;
   const evaluate = (0, eval);
   const compile = Function;
   const stringify = String;
