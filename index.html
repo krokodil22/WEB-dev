@@ -12,6 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script type="module" src="preview-runner.js"></script>
     <meta name="color-scheme" content="dark light" />
     <style>
       html,body{height:100%;margin:0}
@@ -87,6 +88,7 @@
               <option value="mob375x812">Мобильный 375×812 (iPhone X)</option>
             </select>
             <button id="runBtn" style="color:white;" class="transition">▶ Запуск</button>
+            <button id="stopBtn" class="transition-theme">■ Стоп</button>
             <button id="exportBtn" style="color:white;" class="transition">⤓ Экспорт</button>
             <button id="importBtn" class="transition-theme">⤒ Импорт</button>
             <input id="fileInput" type="file" accept="application/json" class="hidden" />
@@ -126,7 +128,7 @@
             <div id="previewArea" class="panelBody device-wrapper" style="padding:0;overflow:hidden">
               <div id="scaleBadge" class="device-badge">scale 100%</div>
               <div id="viewport" class="device-viewport">
-                <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-same-origin" referrerpolicy="no-referrer"></iframe>
+                <iframe id="preview" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe>
               </div>
             </div>
           </section>
@@ -163,7 +165,7 @@
           ta.addEventListener('input',()=>listeners.change.forEach(fn=>fn(api)));
           const api={
             getValue:()=>ta.value,
-            setValue:(v)=>{ta.value=v??'';},
+            setValue:(v)=>{ta.value=v??'';listeners.change.forEach(fn=>fn(api));},
             on:(event,cb)=>{if(listeners[event]) listeners[event].push(cb);},
             refresh:()=>{},
             setOption:(name,val)=>{if(name==='theme'){ ta.dataset.theme=val; }}
@@ -246,14 +248,14 @@
                 if(asset&&asset.blobUrl){ URL.revokeObjectURL(asset.blobUrl); }
                 assets.delete(f.name);
                 row.remove();
-                // Перезапустить предпросмотр, чтобы карта ресурсов обновилась
-                run();
+                // Обновить ресурсы, не запуская сохранённый JavaScript.
+                stopPreview();
               }catch(e){ console.error(e); }
             });
             list.appendChild(row);
           }
-          // после добавления — перезапустить, чтобы подхватить новые ссылки
-          run();
+          // Обновить статический предпросмотр; JS запускается только явно.
+          stopPreview();
         }
         function toggleAssetsBar(){
           const bar=document.getElementById('assetsBar');
@@ -305,20 +307,6 @@
           });
           return doc.body.innerHTML;
         }
-        function runtimeMapperScript(){
-          var mapObj={}; assets.forEach(function(v,k){ mapObj[k]=v.dataUrl; });
-          var json=JSON.stringify(mapObj);
-          var s="(function(){";
-          s+="var MAP="+json+";";
-          s+="function res(u){try{if(!u)return u;var clean=u.split('?')[0].split('#')[0];if(clean.indexOf('./')===0)clean=clean.slice(2);if(clean.indexOf('/')===0)clean=clean.slice(1);if(clean.indexOf('assets/')===0){var k=clean.slice(7);if(MAP[k])return MAP[k]}return u}catch(e){return u}}";
-          s+="function patch(root){var sels=['img','script','link','video','audio','source','iframe'];for(var i=0;i<sels.length;i++){var sel=sels[i];var nodes=root.querySelectorAll(sel);for(var j=0;j<nodes.length;j++){var el=nodes[j];var attr=(sel==='link')?'href':'src';if(el.hasAttribute(attr)){var val=el.getAttribute(attr);var r=res(val);if(r!==val)el.setAttribute(attr,r);}}}}";
-          s+="document.addEventListener('DOMContentLoaded',function(){patch(document);var mo=new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i];if(m.addedNodes){for(var k=0;k<m.addedNodes.length;k++){var n=m.addedNodes[k];if(n.querySelectorAll)patch(n);}}}});mo.observe(document.documentElement,{childList:true,subtree:true});});";
-          s+="var _f=window.fetch.bind(window);window.fetch=function(input,init){if(typeof input==='string'){input=res(input);}else if(input&&input.url){input=new Request(res(input.url),input);}return _f(input,init)};";
-          s+="var _o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){return _o.call(this,m,res(u),arguments[2],arguments[3],arguments[4])};";
-          s+="})();";
-          return s;
-        }
-
         function hookDropzone(){
           const dz=document.getElementById('dropzone');
           ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();dz.classList.add('drag');}));
@@ -342,45 +330,40 @@
           document.getElementById('sizeBadge').textContent='Предпросмотр • '+label();
         }
 
-        function buildSrcDoc(){
-          const html=replaceAssetUrlsInHtml(cmHtml.getValue());
-          const css=replaceAssetUrls(cmCss.getValue());
-          const js=replaceAssetUrls(cmJs.getValue());
-          const sandboxBridge='('+function(){
-            (function(){
-              function p(type,args){ parent.postMessage({__sandboxLog:true,type:type,payload:[].slice.call(args).map(function(x){ try{return (typeof x==='object')?JSON.stringify(x):String(x);}catch(e){return String(x);} })},'*'); }
-              ['log','info','warn','error'].forEach(function(k){ var old=console[k]; console[k]=function(){ p(k,arguments); old&&old.apply(console,arguments);} });
-              window.addEventListener('error',function(e){ p('error',[e.message]); });
-              window.addEventListener('unhandledrejection',function(e){ p('error',['UnhandledPromise', (e.reason&&e.reason.message)||String(e.reason)]); });
-            })();
-          }+')();';
-
-          return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body>'+html+
-                 '<script>'+sandboxBridge+'<\/script>'+
-                 '<script>'+runtimeMapperScript()+'<\/script>'+
-                 '<script>'+js+'<\/script></body></html>';
+        let previewRunner;
+        function renderPreview(execute){
+          if(!previewRunner){
+            previewRunner=new PreviewRunner({log,onFrame:function(frame){
+              frame.addEventListener('load',updateViewportScale);
+              updateViewportScale();
+            }});
+          }
+          return previewRunner.render(
+            replaceAssetUrlsInHtml(cmHtml.getValue()),
+            replaceAssetUrls(cmCss.getValue()),
+            replaceAssetUrls(cmJs.getValue()),execute
+          );
         }
-
-        function run(){
-          document.getElementById('preview').srcdoc=buildSrcDoc();
-        }
+        function run(){renderPreview(true);}
+        function stopPreview(){renderPreview(false);}
 
         // Console
         function log(level,text){
           const out=document.getElementById('consoleOut');
           const div=document.createElement('div');
           div.className=level==='error'?'text-red-600 dark:text-red-400':level==='warn'?'text-yellow-700 dark:text-yellow-300':level==='info'?'text-sky-700 dark:text-sky-300':'text-slate-700 dark:text-slate-200';
-          div.innerHTML='<span class="opacity-60">['+level+']</span> '+text;
-          out.appendChild(div); out.scrollTop=out.scrollHeight;
+          div.textContent='['+level+'] '+text;
+          out.appendChild(div); while(out.children.length>200) out.firstChild.remove(); out.scrollTop=out.scrollHeight;
         }
         function clearLogs(){document.getElementById('consoleOut').innerHTML='';}
-        window.addEventListener('message',function(e){var d=e.data;if(!d||!d.__sandboxLog) return; log(d.type,(d.payload||[]).join(' '));});
 
         document.addEventListener('DOMContentLoaded',function(){
           initEditors();
           applyTheme(initialTheme());
           switchTab('html');
-          run();
+          // Restore text, never automatically execute persisted JavaScript.
+          renderPreview(false);
+          log('info','Код восстановлен. JavaScript запускается только кнопкой «Запуск».');
 
           document.getElementById('preview').addEventListener('load', updateViewportScale);
 
@@ -390,6 +373,7 @@
           });
           document.querySelectorAll('.tab-btn').forEach(function(b){ b.addEventListener('click', function(){ switchTab(b.getAttribute('data-tab')); }); });
           document.getElementById('runBtn').addEventListener('click', run);
+          document.getElementById('stopBtn').addEventListener('click',function(){stopPreview();log('info','Предпросмотр остановлен.');});
           document.getElementById('exportBtn').addEventListener('click', exportProject);
           document.getElementById('importBtn').addEventListener('click', function(){ document.getElementById('fileInput').click(); });
           document.getElementById('fileInput').addEventListener('change', function(e){ var f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) importProject(f).catch(function(err){ alert('Импорт не удался: '+(err.message||err)); }); });
@@ -443,7 +427,8 @@
           const text=await file.text(); const data=JSON.parse(text);
           if(!data || typeof data.html!=='string' || typeof data.css!=='string' || typeof data.js!=='string') throw new Error('Неверный формат файла');
           cmHtml.setValue(data.html); cmCss.setValue(data.css); cmJs.setValue(data.js);
-          run();
+          stopPreview();
+          log('info','Проект импортирован. Нажмите «Запуск» для выполнения JavaScript.');
         }
       })();
     </script>
